@@ -29,6 +29,7 @@ class GridAPI:
         Perform a calculation using three numbers A, B, and C.
         This is a placeholder function that sums the numbers.
         """
+        print(f"Calculating({A=}, {B=}, {C=})")
         result = A + B + C  # Replace this with your actual calculation logic
         return result
 

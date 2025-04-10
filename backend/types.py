@@ -31,7 +31,7 @@ class ChatRequest(BaseModel):
 
 # XXX: This tool definition is OpenAI specific, might need to refactor to support other LLM API's
 class ToolDefinition(TypedDict):
-    type: str
+    type: Literal["function"]
     name: str
     description: str
     parameters: dict
