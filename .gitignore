@@ -1,0 +1,15 @@
+__pycache__
+*.pyc
+*.sw?
+venv
+.venv*
+*.egg-info
+.env
+docker/.env
+.python-version
+.coverage
+.idea
+.mypy_cache/
+.vscode/
+.wheels/*.whl
+.DS_Store
