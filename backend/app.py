@@ -5,7 +5,7 @@ from starlette.routing import Route
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
-from .schema import ChatRequest
+from .types import ChatRequest
 
 from .config import get_config
 from .grid import GridAPI
@@ -15,6 +15,7 @@ from .llm.openai import OpenAITooledChat
 config = get_config()
 GRID = GridAPI()
 openai_chat = OpenAITooledChat(config, tools=GRID.tools)
+
 
 async def chat(request: Request):
     try:
@@ -26,13 +27,10 @@ async def chat(request: Request):
     messages = chat_request.messages
 
     # Define the tool for collecting numbers
-    tools = [
 
-    ]
+    response = await openai_chat.create_response(messages)
 
-    response = await process_openai_response(messages, tools)
-
-    return JSONResponse({"reply": response.content[0].text})
+    return JSONResponse({"reply": response.content, "role": response.role})
 
 
 app = Starlette(

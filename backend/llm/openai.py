@@ -1,11 +1,19 @@
 import json
-from typing import Iterable
+from typing import Iterable, Union, cast, TypeAlias
 
 import openai
-from openai.types.beta import FunctionToolParam
+from openai import NotGiven
+
+from openai.types.responses import ComputerToolParam, WebSearchToolParam, FileSearchToolParam, FunctionToolParam
+from openai.types.responses.response_input_param import ResponseInputItemParam
+
+ToolParam: TypeAlias = Union[FunctionToolParam, FileSearchToolParam, ComputerToolParam, WebSearchToolParam]
+
+MessageParam: TypeAlias = ResponseInputItemParam
+
 
 from ..config import AppConfig
-from ..types import MessageList, Message, FunctionCallRequest, FunctionCallOutput, ToolBinding, ToolDefinition
+from ..types import MessageList, FunctionCallRequest, FunctionCallOutput, ToolBinding, TextMessage
 
 
 class OpenAITooledChat:
@@ -13,17 +21,19 @@ class OpenAITooledChat:
         self.tools = tools
         openai.api_key = config.OPENAI_API_KEY
 
-    async def create_response(self, messages: MessageList) -> Message:
+    async def create_response(self, messages: MessageList) -> TextMessage:
         """
         Wraps the openai.responses.create call, handles function calls, and sends the result back to OpenAI.
         """
-        response = openai.responses.create(model="gpt-4o", input=[m.dict() for m in messages], tools=self.tool_definitions)
+        response = openai.responses.create(
+            model="gpt-4o",
+            input=[cast(MessageParam, m.dict()) for m in messages],
+            tools=cast(Iterable[ToolParam] | NotGiven, self.tool_definitions),
+        )
 
         print("response.output=", response.output)
-
-        last_output = response.output[0]
         # XXX: there seems to be only one output most of the time, need to read up on why this is an array
-        print("len of output=", len(response.output))
+        last_output = response.output[0]
 
         if last_output.type == "function_call":
             tool_call = last_output
@@ -37,7 +47,7 @@ class OpenAITooledChat:
                     )
                 )
                 args = json.loads(tool_call.arguments)
-                result = make_calculation(**args)
+                result = self.tools["make_calculation"]["ref"](**args)
 
                 # Create a new object to add to input
                 function_call_output = FunctionCallOutput(
@@ -50,10 +60,11 @@ class OpenAITooledChat:
                 messages.append(function_call_output)
                 return await self.create_response(messages)
 
-        return last_output
+        return TextMessage(
+            role="assistant",
+            content="" if last_output.type != "text" else last_output.content[0].text,
+        )
 
     @property
     def tool_definitions(self) -> Iterable[FunctionToolParam]:
-        return [
-            FunctionToolParam(**tool["schema"]) for tool in self.tools.values()
-        ]
+        return [FunctionToolParam(**tool["schema"], strict=True, type="function") for tool in self.tools.values()]

@@ -1,7 +1,6 @@
 from .types import ToolBinding
 
 
-
 class GridAPI:
     def __init__(self):
         self._tools: dict[str, ToolBinding] = {
@@ -21,7 +20,7 @@ class GridAPI:
                         "required": ["A", "B", "C"],
                         "additionalProperties": False,
                     },
-                }
+                },
             }
         }
 

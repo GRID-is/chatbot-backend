@@ -29,7 +29,6 @@ class ChatRequest(BaseModel):
     messages: MessageList
 
 
-
 # XXX: This tool definition is OpenAI specific, might need to refactor to support other LLM API's
 class ToolDefinition(TypedDict):
     type: str
@@ -41,4 +40,3 @@ class ToolDefinition(TypedDict):
 class ToolBinding(TypedDict):
     ref: Callable
     schema: ToolDefinition
-
