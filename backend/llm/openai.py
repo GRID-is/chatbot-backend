@@ -1,5 +1,6 @@
 import json
 import logging
+from inspect import isawaitable
 from typing import Any, Iterable, Optional, TypeAlias, Union, cast
 
 import openai
@@ -42,7 +43,7 @@ class OpenAITooledChat:
         for response_type, output in self.yield_responses(response):
             if response_type == "function_call":
                 tool_call = output
-                function_call_output = self.handle_function_call(tool_call)
+                function_call_output = await self.handle_function_call(tool_call)
                 if function_call_output:
                     messages.append(
                         FunctionCallRequest(
@@ -73,10 +74,14 @@ class OpenAITooledChat:
         )
         return TextMessage(role="assistant", content="error, unexpected response type from LLM")
 
-    def handle_function_call(self, tool_call: FunctionCallRequest) -> Optional[FunctionCallOutput]:
+    async def handle_function_call(self, tool_call: FunctionCallRequest) -> Optional[FunctionCallOutput]:
         if tool_call.name in self.tools:
             args = json.loads(tool_call.arguments)
+            callable = self.tools[tool_call.name]["ref"]
+            # if the callable is an async function, await it, otherwise call it:
             result = self.tools[tool_call.name]["ref"](**args)
+            if isawaitable(result):
+                result = await result
 
             # Create a new object to add to input
             return FunctionCallOutput(

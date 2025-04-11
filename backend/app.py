@@ -11,7 +11,7 @@ from .llm.openai import OpenAITooledChat
 from .types import ChatRequest
 
 config = get_config()
-GRID = GridAPI()
+GRID = GridAPI(config)
 openai_chat = OpenAITooledChat(config, tools=GRID.tools)
 
 
