@@ -49,15 +49,9 @@ def create_toolbinding(method: Callable, name: Optional[str] = None) -> ToolBind
             "type": "function",
             "name": name,
             "description": (method.__doc__ or "").strip(),
-            "parameters": {
-                "type": "object",
-                "properties": parameter_schema["properties"],
-                "required": required,
-                "additionalProperties": False,
-            },
+            "parameters": parameter_schema,
         },
     }
-
 
 class GridAPI:
     def __init__(self, config: AppConfig):
@@ -65,17 +59,11 @@ class GridAPI:
         self._client = AsyncGrid(api_key=config.GRID_API_KEY)
         self._project_x = ProjectXRevenueModel(self._client)
         self._tools: dict[str, ToolBinding] = {
-            "make_calculation": create_toolbinding(self.make_calculation),
             "get_model_defaults": create_toolbinding(self._project_x.get_model_defaults),
             "forecast_revenue": create_toolbinding(self._project_x.forecast_revenue, name="forecast_revenue"),
         }
-
-    def make_calculation(self, A: int, B: int, C: Optional[int] = 10) -> int:
-        """
-        Perform a calculation using three numbers A, B, and C.
-        """
-        print(f"Calculating({A=}, {B=}, {C=})")
-        return A + B + C
+        import pprint
+        pprint.pprint(self._tools)
 
     @property
     def tools(self) -> dict[str, ToolBinding]:
