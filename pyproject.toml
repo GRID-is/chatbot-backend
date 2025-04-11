@@ -8,3 +8,9 @@ line-length = 120
 # https://github.com/astral-sh/ruff#supported-rules
 select = ["E", "F", "T", "W"]
 ignore = ["W292", "T201"]
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "ERROR"
+asyncio_mode = "auto"
+
