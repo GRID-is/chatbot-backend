@@ -10,3 +10,12 @@ black: venv
 
 mypy: venv
 	venv/bin/mypy --check-untyped-defs backend/
+
+lint: venv
+	venv/bin/ruff check --fix backend/
+
+isort: venv
+	venv/bin/ruff check --select I --fix
+	venv/bin/ruff format
+
+iblm: isort black lint mypy

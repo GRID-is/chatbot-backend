@@ -1,29 +1,24 @@
 import json
 import logging
-from typing import Iterable, Union, cast, TypeAlias
+from typing import Iterable, TypeAlias, Union, cast
 
 import openai
 from openai import NotGiven
-
 from openai.types.responses import (
     ComputerToolParam,
-    WebSearchToolParam,
     FileSearchToolParam,
     FunctionToolParam,
-    ResponseOutputText,
+    WebSearchToolParam,
 )
 from openai.types.responses.response_input_param import ResponseInputItemParam
 
-ToolParam: TypeAlias = Union[FunctionToolParam, FileSearchToolParam, ComputerToolParam, WebSearchToolParam]
+from backend.config import AppConfig
+from backend.types import FunctionCallOutput, FunctionCallRequest, MessageList, TextMessage, ToolBinding
 
+ToolParam: TypeAlias = Union[FunctionToolParam, FileSearchToolParam, ComputerToolParam, WebSearchToolParam]
 MessageParam: TypeAlias = ResponseInputItemParam
 
-
 logger = logging.getLogger(__name__)
-
-
-from ..config import AppConfig
-from ..types import MessageList, FunctionCallRequest, FunctionCallOutput, ToolBinding, TextMessage
 
 
 class OpenAITooledChat:
