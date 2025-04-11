@@ -37,7 +37,6 @@ class OpenAITooledChat:
             tools=cast(Iterable[ToolParam] | NotGiven, self.tool_definitions),
         )
 
-        print("response.output=", response.output)
         performed_function_calls = False
 
         for response_type, output in self.yield_responses(response):
@@ -54,6 +53,7 @@ class OpenAITooledChat:
                         )
                     )
                     messages.append(function_call_output)
+                    print("function call response:", function_call_output)
                     performed_function_calls = True
 
         if performed_function_calls:
@@ -77,7 +77,6 @@ class OpenAITooledChat:
     async def handle_function_call(self, tool_call: FunctionCallRequest) -> Optional[FunctionCallOutput]:
         if tool_call.name in self.tools:
             args = json.loads(tool_call.arguments)
-            callable = self.tools[tool_call.name]["ref"]
             # if the callable is an async function, await it, otherwise call it:
             result = self.tools[tool_call.name]["ref"](**args)
             if isawaitable(result):
@@ -87,7 +86,7 @@ class OpenAITooledChat:
             return FunctionCallOutput(
                 type="function_call_output",
                 call_id=tool_call.call_id,
-                output=str(result),
+                output=json.dumps(result),
             )
         else:
             logger.error(f"No tool found for function call: {tool_call.name}", extra={"tool_call": tool_call})

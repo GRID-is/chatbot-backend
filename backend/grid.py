@@ -8,10 +8,7 @@ from pydantic import create_model
 from .config import AppConfig
 from .types import ToolBinding
 
-
 logger = logging.getLogger(__name__)
-
-
 
 
 class GRIDExecutionException(Exception):
@@ -23,23 +20,28 @@ def create_toolbinding(method: Callable, name: Optional[str] = None) -> ToolBind
     Create a ToolBinding object for a given method and name.
     If no name is provided, the method's name will be used.
     """
-    name = name or method.__name__
-    if not name:
-        raise ValueError("Can't determine a tool name from the given method, consider providing one")
+    if name is None:
+        if method.__name__ is None:
+            raise ValueError("Can't determine a tool name from the given method, consider providing one")
+        name = method.__name__
 
     signature = inspect.signature(method)
+
+    # Dynamically create a Pydantic model for the method's parameters
     fields = {
-        param_name: (param.annotation, ...)
+        param_name: (param.annotation, param.default if param.default is not inspect.Parameter.empty else ...)
         for param_name, param in signature.parameters.items()
         if param_name != "self" and param.annotation is not inspect.Parameter.empty
     }
+    # OpenAI requires *all* parameters to be required, even if they are not..
+    required = list([str(field) for field in fields.keys()])
 
-    parameter_schema = {
-        "type": "object",
-        "properties": {key: {"type": param.annotation.__name__.lower()} for key, (param.annotation, _) in fields.items()},
-        "required": list(fields.keys()),
-        "additionalProperties": False,
-    }
+    # Generate JSON Schema for the parameters
+    parameter_schema = create_model(name + "Parameters", **fields).model_json_schema()
+
+    # Remove 'default' from all properties (OpenAI rejects default values in the schema)
+    for prop in parameter_schema["properties"].values():
+        prop.pop("default", None)
 
     return {
         "ref": method,
@@ -47,7 +49,12 @@ def create_toolbinding(method: Callable, name: Optional[str] = None) -> ToolBind
             "type": "function",
             "name": name,
             "description": (method.__doc__ or "").strip(),
-            "parameters": parameter_schema,
+            "parameters": {
+                "type": "object",
+                "properties": parameter_schema["properties"],
+                "required": required,
+                "additionalProperties": False,
+            },
         },
     }
 
@@ -59,10 +66,9 @@ class GridAPI:
         self._project_x = ProjectXRevenueModel(self._client)
         self._tools: dict[str, ToolBinding] = {
             "make_calculation": create_toolbinding(self.make_calculation),
+            "get_model_defaults": create_toolbinding(self._project_x.get_model_defaults),
             "forecast_revenue": create_toolbinding(self._project_x.forecast_revenue, name="forecast_revenue"),
         }
-        import pprint
-        pprint.pprint(self._tools)
 
     def make_calculation(self, A: int, B: int, C: Optional[int] = 10) -> int:
         """
@@ -87,8 +93,8 @@ class ProjectXRevenueModel:
         # order to generate python-compliant variable names for them, and to use them nicely in methods like the
         # ones on this class.
         self._parameter_references = {
-            "ad_budget": "B1",
-            "ad_cpc": "B2",
+            "ad_budget": "B4",
+            "ad_cpc": "B5",
             "registration_conversion_rate": "B8",
             "subscription_conversion_rate": "B9",
             "registration_conversion_lag_in_months": "B12",
@@ -101,25 +107,34 @@ class ProjectXRevenueModel:
         }
 
         self._data_ranges = {
-            #"Registrations": "Sheet1!C31:AL31",
-            #"Registered users": "Sheet1!C36:AL36",
+            # "Registrations": "Sheet1!C31:AL31",
+            # "Registered users": "Sheet1!C36:AL36",
             "Subscribers": "Sheet1!C37:AL37",
             "ARR (month 36)": "Sheet1!C43",
             "Monthly Recurring Revenue": "Sheet1!C39:AL39",
             "Revenue from Existing subscribers": "Sheet1!C40:AL40",
             "Revenue from New subscribers": "Sheet1!C41:AL41",
-            #"New subscriptions": "Sheet1!C32:AL32",
-            #"Visitors": "Sheet1!C28:AL28",
-            #"Churned users": "Sheet1!C34:AL34",
-            #"Organic": "Sheet1!C29:AL29",
-            #"Paid": "Sheet1!C30:AL30",
+            # "New subscriptions": "Sheet1!C32:AL32",
+            # "Visitors": "Sheet1!C28:AL28",
+            # "Churned users": "Sheet1!C34:AL34",
+            # "Organic": "Sheet1!C29:AL29",
+            # "Paid": "Sheet1!C30:AL30",
         }
-        self._cell_ref_labels = {value: key for key, value in list(self._data_ranges.items()) + list(self._parameter_references.items())}
+        self._cell_ref_labels = {
+            value: key for key, value in list(self._data_ranges.items()) + list(self._parameter_references.items())
+        }
 
-    async def get_model_defaults(self):
-        """ Get the default values for all the model parameters used in 'forecast_revenue'
-        """
-        reads = []
+    async def get_model_defaults(self) -> dict[str, str | int | float | bool | None]:
+        """Get the default values for all the model parameters used in 'forecast_revenue'"""
+        reads = list(self._parameter_references.values())
+        result = await self._grid_client.workbooks.query(id=self._workbook_id, read=reads)
+        print("result=", result)
+        response = {
+            self._cell_ref_labels.get(read_result.source, read_result.source): read_result.data[0][0].v
+            for read_result in result.read
+        }
+        print("get_model_defaults response=", response)
+        return response
 
     async def forecast_revenue(
         self,
@@ -189,8 +204,9 @@ class ProjectXRevenueModel:
             source_label = self._cell_ref_labels.get(source, source)
             print("read_result=", read_result)
             if len(read_result.data) != 1:
-                logger.warning("Received incorrect number of rows, only one row (series) for each source expected. "
-                               f"Using the first row in response (source: {source})")
+                logger.warning(
+                    "Received incorrect number of rows, only one row (series) for each source expected. "
+                    f"Using the first row in response (source: {source})"
+                )
             response[source_label] = [cell.w for cell in read_result.data[0]]
         return response
-
