@@ -1,6 +1,6 @@
 from typing import Optional
 
-from backend.grid import create_toolbinding
+from backend.llm.openai import create_toolbinding
 
 
 def sample_method(param1: str, param2: int, param3: float, param4: bool, param5: Optional[str] = None):

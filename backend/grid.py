@@ -1,12 +1,11 @@
-import inspect
 import logging
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from grid_api import AsyncGrid
 from grid_api.types.workbook_query_params import Apply
-from pydantic import create_model
 
 from .config import AppConfig
+from .llm.openai import create_toolbinding
 from .types import ToolBinding
 
 logger = logging.getLogger(__name__)
@@ -14,47 +13,6 @@ logger = logging.getLogger(__name__)
 
 class GRIDExecutionException(Exception):
     pass
-
-
-def create_toolbinding(method: Callable, name: Optional[str] = None) -> ToolBinding:
-    """
-    Create a ToolBinding object for a given method and name.
-    If no name is provided, the method's name will be used.
-    """
-    if name is None:
-        if method.__name__ is None:
-            raise ValueError("Can't determine a tool name from the given method, consider providing one")
-        name = method.__name__
-
-    signature = inspect.signature(method)
-
-    # Dynamically create a Pydantic model for the method's parameters
-    fields: dict[str, tuple[str, Any]] = {
-        param_name: (param.annotation, param.default if param.default is not inspect.Parameter.empty else ...)
-        for param_name, param in signature.parameters.items()
-        if param_name != "self" and param.annotation is not inspect.Parameter.empty
-    }
-
-    # Generate JSON Schema for the parameters
-    parameter_schema = create_model(name + "Parameters", **fields).model_json_schema()  # type: ignore[call-overload]
-
-    # Remove 'default' from all properties (OpenAI rejects default values in the schema)
-    for prop in parameter_schema["properties"].values():
-        prop.pop("default", None)
-
-    # OpenAI demands all schemas have additionalProperties=false and all parameters are required..
-    parameter_schema["additionalProperties"] = False
-    parameter_schema["required"] = list([str(field) for field in fields.keys()])
-
-    return {
-        "ref": method,
-        "schema": {
-            "type": "function",
-            "name": name,
-            "description": (method.__doc__ or "").strip(),
-            "parameters": parameter_schema,
-        },
-    }
 
 
 class GridAPI:
