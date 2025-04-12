@@ -3,6 +3,7 @@ import logging
 from typing import Any, Callable, Optional
 
 from grid_api import AsyncGrid
+from grid_api.types.workbook_query_params import Apply
 from pydantic import create_model
 
 from .config import AppConfig
@@ -65,9 +66,6 @@ class GridAPI:
             "get_model_defaults": create_toolbinding(self._project_x.get_model_defaults),
             "forecast_revenue": create_toolbinding(self._project_x.forecast_revenue, name="forecast_revenue"),
         }
-        import pprint
-
-        pprint.pprint(self._tools)
 
     @property
     def tools(self) -> dict[str, ToolBinding]:
@@ -150,7 +148,7 @@ class ProjectXRevenueModel:
         virality_per_registered_user: Optional[float] = None,
         virality_per_subscribed_user: Optional[float] = None,
         subscription_price: Optional[float] = None,
-    ) -> dict[str, list[str]]:
+    ) -> dict[str, list[Any]]:
         f"""
         Calculate the revenue for the a business model with the given parameters.  Returns a timeseries of values
         for each of the following:
@@ -191,12 +189,7 @@ class ProjectXRevenueModel:
             else:
                 if value is None:
                     continue
-                apply.append(
-                    {
-                        "target": self._parameter_references[key],
-                        "value": value,
-                    }
-                )
+                apply.append(Apply(target=self._parameter_references[key], value=value))
 
         result = await self._grid_client.workbooks.query(id=self._workbook_id, read=reads, apply=apply)
         response = {}
@@ -211,11 +204,11 @@ class ProjectXRevenueModel:
                 valid_cells = []
                 for row in read_result.data:
                     if isinstance(row, list):
-                        valid_row = [cell.v for cell in row if hasattr(cell, "v")]
+                        valid_row = [cell.v for cell in row if hasattr(cell, "v") and cell is not None]
                         valid_cells.append(valid_row)
-                    elif hasattr(row, "v"):
+                    elif hasattr(row, "v") and row is not None:
                         valid_cells.append([row.v])
-            elif hasattr(read_result.data, "v"):
+            elif hasattr(read_result.data, "v") and read_result.data is not None:
                 valid_cells = [[read_result.data.v]]
             else:
                 valid_cells = []
