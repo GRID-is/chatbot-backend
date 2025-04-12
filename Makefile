@@ -7,13 +7,13 @@ run: venv
 	chpst -e .env venv/bin/uvicorn --reload --port 8881 backend.app:app
 
 black: venv
-	venv/bin/black backend/
+	venv/bin/black backend/ tests/
 
 mypy: venv
 	venv/bin/mypy --check-untyped-defs backend/
 
 lint: venv
-	venv/bin/ruff check --fix backend/
+	venv/bin/ruff check --fix backend/ tests/
 
 isort: venv
 	venv/bin/ruff check --select I --fix

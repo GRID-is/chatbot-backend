@@ -51,7 +51,9 @@ async def test_create_response_single_message(mock_create, openai_tooled_chat):
     # Mock OpenAI response with a single message
     mock_create.return_value = MagicMock(
         output=[
-            MockResponseOutput(type="message", content=[MockResponseContent(type="output_text", text="Hello, world!")])
+            MockResponseOutput(
+                type="message", content=[MockResponseContent(type="output_text", text="Hello, world!")]
+            )
         ]
     )
 
@@ -75,7 +77,9 @@ async def test_create_response_function_call(mock_create, openai_tooled_chat):
         ),
         MagicMock(
             output=[
-                MockResponseOutput(type="message", content=[MockResponseContent(type="output_text", text="Result: 5")])
+                MockResponseOutput(
+                    type="message", content=[MockResponseContent(type="output_text", text="Result: 5")]
+                )
             ]
         ),
     ]
@@ -111,8 +115,12 @@ async def test_create_response_multiple_outputs(mock_create, openai_tooled_chat,
     # Mock OpenAI response with multiple outputs
     mock_create.return_value = MagicMock(
         output=[
-            MockResponseOutput(type="message", content=[MockResponseContent(type="output_text", text="Message 1")]),
-            MockResponseOutput(type="message", content=[MockResponseContent(type="output_text", text="Message 2")]),
+            MockResponseOutput(
+                type="message", content=[MockResponseContent(type="output_text", text="Message 1")]
+            ),
+            MockResponseOutput(
+                type="message", content=[MockResponseContent(type="output_text", text="Message 2")]
+            ),
         ]
     )
 
