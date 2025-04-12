@@ -121,10 +121,19 @@ class ProjectXRevenueModel:
         reads = list(self._parameter_references.values())
         result = await self._grid_client.workbooks.query(id=self._workbook_id, read=reads)
         print("result=", result)
-        response = {
-            self._cell_ref_labels.get(read_result.source, read_result.source): read_result.data[0][0].v
-            for read_result in result.read
-        }
+        response = {}
+        for read in result.read:
+            # read can be a table, list or a single cell, the data we're looking for is single values
+            # but it's unclear whether the API will return a single cell, or a list, it probably won't return
+            # tables.
+            data = read.data
+            while isinstance(data, list):
+                data = data[0]  # type: ignore
+            if data is not None and hasattr(data, "v"):
+                response[self._cell_ref_labels[read.source]] = data.v
+            else:
+                logger.warning(f"Unable to retrieve value from {read}")
+                response[self._cell_ref_labels[read.source]] = data
         print("get_model_defaults response=", response)
         return response
 
