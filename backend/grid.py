@@ -1,6 +1,6 @@
 import inspect
 import logging
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from grid_api import AsyncGrid
 from pydantic import create_model
@@ -28,20 +28,22 @@ def create_toolbinding(method: Callable, name: Optional[str] = None) -> ToolBind
     signature = inspect.signature(method)
 
     # Dynamically create a Pydantic model for the method's parameters
-    fields = {
+    fields: dict[str, tuple[str, Any]] = {
         param_name: (param.annotation, param.default if param.default is not inspect.Parameter.empty else ...)
         for param_name, param in signature.parameters.items()
         if param_name != "self" and param.annotation is not inspect.Parameter.empty
     }
-    # OpenAI requires *all* parameters to be required, even if they are not..
-    required = list([str(field) for field in fields.keys()])
 
     # Generate JSON Schema for the parameters
-    parameter_schema = create_model(name + "Parameters", **fields).model_json_schema()
+    parameter_schema = create_model(name + "Parameters", **fields).model_json_schema()  # type: ignore[call-overload]
 
     # Remove 'default' from all properties (OpenAI rejects default values in the schema)
     for prop in parameter_schema["properties"].values():
         prop.pop("default", None)
+
+    # OpenAI demands all schemas have additionalProperties=false and all parameters are required..
+    parameter_schema["additionalProperties"] = False
+    parameter_schema["required"] = list([str(field) for field in fields.keys()])
 
     return {
         "ref": method,
@@ -53,6 +55,7 @@ def create_toolbinding(method: Callable, name: Optional[str] = None) -> ToolBind
         },
     }
 
+
 class GridAPI:
     def __init__(self, config: AppConfig):
         self._config = config
@@ -63,6 +66,7 @@ class GridAPI:
             "forecast_revenue": create_toolbinding(self._project_x.forecast_revenue, name="forecast_revenue"),
         }
         import pprint
+
         pprint.pprint(self._tools)
 
     @property
@@ -139,7 +143,7 @@ class ProjectXRevenueModel:
         subscription_price: Optional[float] = None,
     ) -> dict[str, list[str]]:
         f"""
-        Calculage the revenue for the a business model with the given parameters.  Returns a timeseries of values
+        Calculate the revenue for the a business model with the given parameters.  Returns a timeseries of values
         for each of the following:
         - Monthly Recurring Revenue
         - Revenue from Existing subscribers
@@ -157,7 +161,7 @@ class ProjectXRevenueModel:
         ]
 
         apply = []
-        parameters = {
+        parameters: dict[str, str | int | float | bool | None] = {
             "ad_budget": ad_budget,
             "ad_cpc": ad_cpc,
             "registration_conversion_rate": registration_conversion_rate,
@@ -191,10 +195,27 @@ class ProjectXRevenueModel:
             source = read_result.source
             source_label = self._cell_ref_labels.get(source, source)
             print("read_result=", read_result)
-            if len(read_result.data) != 1:
+
+            # Ensure we only process cells with a 'v' property
+            # Handle cases where `data` can be a single cell or other types
+            if isinstance(read_result.data, list):
+                valid_cells = []
+                for row in read_result.data:
+                    if isinstance(row, list):
+                        valid_row = [cell.v for cell in row if hasattr(cell, "v")]
+                        valid_cells.append(valid_row)
+                    elif hasattr(row, "v"):
+                        valid_cells.append([row.v])
+            elif hasattr(read_result.data, "v"):
+                valid_cells = [[read_result.data.v]]
+            else:
+                valid_cells = []
+
+            if len(valid_cells) != 1:
                 logger.warning(
                     "Received incorrect number of rows, only one row (series) for each source expected. "
                     f"Using the first row in response (source: {source})"
                 )
-            response[source_label] = [cell.w for cell in read_result.data[0]]
+
+            response[source_label] = valid_cells[0] if valid_cells else []
         return response
