@@ -108,7 +108,7 @@ class ProjectXRevenueModel:
         subscription_price: Optional[float] = None,
     ) -> dict[str, list[Any]]:
         f"""
-        Calculate the revenue for the a business model with the given parameters.  Returns a timeseries of values
+        Calculate the revenue for a business model with the given parameters.  Returns a timeseries of values
         for each of the following:
         - Monthly Recurring Revenue
         - Revenue from Existing subscribers
