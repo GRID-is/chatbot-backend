@@ -26,3 +26,5 @@ test_%: venv
 	venv/bin/pytest --tb=short -vsx --pdb -k $@ tests/
 
 iblm: isort black lint mypy
+
+iblmt: iblm test
