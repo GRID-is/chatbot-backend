@@ -4,7 +4,6 @@ from typing import Any, Optional
 from grid_api import AsyncGrid
 from grid_api.types.workbook_query_params import Apply
 
-
 logger = logging.getLogger(__name__)
 
 
