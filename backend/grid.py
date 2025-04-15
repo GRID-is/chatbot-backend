@@ -4,30 +4,12 @@ from typing import Any, Optional
 from grid_api import AsyncGrid
 from grid_api.types.workbook_query_params import Apply
 
-from .config import AppConfig
-from .llm.openai import create_toolbinding
-from .types import ToolBinding
 
 logger = logging.getLogger(__name__)
 
 
 class GRIDExecutionException(Exception):
     pass
-
-
-class GridAPI:
-    def __init__(self, config: AppConfig):
-        self._config = config
-        self._client = AsyncGrid(api_key=config.GRID_API_KEY)
-        self._project_x = ProjectXRevenueModel(self._client)
-        self._tools: dict[str, ToolBinding] = {
-            "get_model_defaults": create_toolbinding(self._project_x.get_model_defaults),
-            "forecast_revenue": create_toolbinding(self._project_x.forecast_revenue, name="forecast_revenue"),
-        }
-
-    @property
-    def tools(self) -> dict[str, ToolBinding]:
-        return self._tools
 
 
 class ProjectXRevenueModel:
