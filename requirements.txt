@@ -1,5 +1,5 @@
 black==25.1.0
-git+ssh://git@github.com/stainless-sdks/simple-query-api-python.git
+grid_api==1.0.0
 mypy==1.15.0
 openai==1.72.0
 pydantic==2.11.3
