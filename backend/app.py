@@ -1,4 +1,4 @@
-from grid_api import AsyncGrid
+from simple_query_api import AsyncGrid
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware

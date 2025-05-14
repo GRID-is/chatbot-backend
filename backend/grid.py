@@ -1,8 +1,7 @@
 import logging
 from typing import Any, Optional
 
-from grid_api import AsyncGrid
-from grid_api.types.workbook_query_params import Apply
+from simple_query_api import AsyncGrid
 
 logger = logging.getLogger(__name__)
 
@@ -56,21 +55,14 @@ class ProjectXRevenueModel:
     async def get_model_defaults(self) -> dict[str, str | int | float | bool | None]:
         """Get the default values for all the model parameters used in 'forecast_revenue'"""
         reads = list(self._parameter_references.values())
-        result = await self._grid_client.workbooks.query(id=self._workbook_id, read=reads)
-        print("result=", result)
+        results = await self._grid_client.workbooks.calc(id=self._workbook_id, read=reads)
+        print("results=", results)
         response = {}
-        for read in result.read:
-            # read can be a table, list or a single cell, the data we're looking for is single values
-            # but it's unclear whether the API will return a single cell, or a list, it probably won't return
-            # tables.
-            data = read.data
-            while isinstance(data, list):
-                data = data[0]  # type: ignore
-            if data is not None and hasattr(data, "v"):
-                response[self._cell_ref_labels[read.source]] = data.v
-            else:
-                logger.warning(f"Unable to retrieve value from {read}")
-                response[self._cell_ref_labels[read.source]] = data
+        for cell, result in results.items():
+            if isinstance(result, list):
+                logger.warning(f"Got range response for model default for {cell}, expected single value")
+                continue
+            response[self._cell_ref_labels[cell]] = result.value
         print("get_model_defaults response=", response)
         return response
 
@@ -106,7 +98,6 @@ class ProjectXRevenueModel:
             self._data_ranges["Revenue from New subscribers"],
         ]
 
-        apply = []
         parameters: dict[str, str | int | float | bool | None] = {
             "ad_budget": ad_budget,
             "ad_cpc": ad_cpc,
@@ -120,43 +111,23 @@ class ProjectXRevenueModel:
             "virality_per_subscribed_user": virality_per_subscribed_user,
             "subscription_price": subscription_price,
         }
-        for key, value in parameters.items():
-            if key not in self._parameter_references:
-                logger.warning(
-                    f"Warning, requested a parameter '{key}' which is not found in parameter references"
-                )
-            else:
-                if value is None:
-                    continue
-                apply.append(Apply(target=self._parameter_references[key], value=value))
 
-        result = await self._grid_client.workbooks.query(id=self._workbook_id, read=reads, apply=apply)
+        results = await self._grid_client.workbooks.calc(
+            id=self._workbook_id,
+            read=reads,
+            apply={
+                self._parameter_references[key]: value
+                for key, value in parameters.items()
+                if value is not None and key in self._parameter_references
+            },
+        )
         response = {}
-        for read_result in result.read:
-            source = read_result.source
+        for source, result in results.items():
             source_label = self._cell_ref_labels.get(source, source)
-            print("read_result=", read_result)
-
-            # Ensure we only process cells with a 'v' property
-            # Handle cases where `data` can be a single cell or other types
-            if isinstance(read_result.data, list):
-                valid_cells = []
-                for row in read_result.data:
-                    if isinstance(row, list):
-                        valid_row = [cell.v for cell in row if hasattr(cell, "v") and cell is not None]
-                        valid_cells.append(valid_row)
-                    elif hasattr(row, "v") and row is not None:
-                        valid_cells.append([row.v])
-            elif hasattr(read_result.data, "v") and read_result.data is not None:
-                valid_cells = [[read_result.data.v]]
+            print("read_result=", result)
+            if isinstance(result, list):
+                response[source_label] = [r.value for r in result]
             else:
-                valid_cells = []
+                response[source_label] = [result.value]
 
-            if len(valid_cells) != 1:
-                logger.warning(
-                    "Received incorrect number of rows, only one row (series) for each source expected. "
-                    f"Using the first row in response (source: {source})"
-                )
-
-            response[source_label] = valid_cells[0] if valid_cells else []
         return response
