@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Optional
 
-from simple_query_api import AsyncGrid
+from grid_api import AsyncGrid
 
 logger = logging.getLogger(__name__)
 
@@ -56,14 +56,14 @@ class ProjectXRevenueModel:
         """Get the default values for all the model parameters used in 'forecast_revenue'"""
         reads = list(self._parameter_references.values())
         results = await self._grid_client.workbooks.calc(id=self._workbook_id, read=reads)
-        print("results=", results)
+        logger.debug("results=", results)
         response = {}
         for cell, result in results.items():
             if isinstance(result, list):
                 logger.warning(f"Got range response for model default for {cell}, expected single value")
                 continue
             response[self._cell_ref_labels[cell]] = result.value
-        print("get_model_defaults response=", response)
+        logger.debug(f"get_model_defaults response={response}")
         return response
 
     async def forecast_revenue(
@@ -124,7 +124,7 @@ class ProjectXRevenueModel:
         response = {}
         for source, result in results.items():
             source_label = self._cell_ref_labels.get(source, source)
-            print("read_result=", result)
+            logger.debug(f"read_result={result}")
             if isinstance(result, list):
                 response[source_label] = [r.value for r in result]
             else:

@@ -1,5 +1,5 @@
 black==25.1.0
-grid_api==1.0.0
+grid_api==1.0.1
 mypy==1.15.0
 openai==1.72.0
 pydantic==2.11.3
